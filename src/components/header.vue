@@ -8,12 +8,13 @@
 
         <div>
           <div v-if="loginState">
-            <span>欢迎您<%= user.name %></span>
-            <a href="#">退出登录</a>
+            <span>欢迎您{{username}}</span>
+            <a href="javascript:;" @click="logout">退出登录</a>
           </div>
           <div v-if="!loginState">
-            <a class="btn btn-outline-success" data-toggle="modal" data-target="#registerModal" href="#">注册</a>
-            <a class="btn btn-outline-success" data-toggle="modal" data-target="#loginModal" href="#">登录</a>
+            <a class="btn btn-outline-success" data-toggle="modal" data-target="#registerModal"
+               href="javascript:;">注册</a>
+            <a class="btn btn-outline-success" data-toggle="modal" data-target="#loginModal" href="javascript:;">登录</a>
           </div>
         </div>
       </div>
@@ -32,6 +33,7 @@
           </div>
           <form>
             <div class="modal-body">
+              <span class="text-danger" v-if="registerError">用户名已存在，注册失败！</span>
               <div class="form-group row">
                 <label class="col-sm-2 col-form-label text-right">用户名</label>
                 <div class="col-sm-10 d-flex align-items-center">
@@ -74,13 +76,15 @@
       <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">登录</h5>
+            <h5 class="modal-title" v-if="adminLogin == 'normalUser'">用户登录</h5>
+            <h5 class="modal-title" v-if="adminLogin == 'adminUser'">管理员登录</h5>
             <button type="button" class="close" data-dismiss="modal" aria-label="Close">
               <span aria-hidden="true">&times;</span>
             </button>
           </div>
           <form>
             <div class="modal-body">
+              <span class="text-danger" v-if="loginError">用户名不存在或密码错误</span>
               <div class="form-group row">
                 <label class="col-sm-2 col-form-label text-right">用户名</label>
                 <div class="col-sm-10 d-flex align-items-center">
@@ -108,9 +112,13 @@
                 </div>
               </div>
             </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
-              <button type="button" class="btn btn-primary" @click="login">登录</button>
+            <div class="modal-footer d-flex justify-content-between">
+              <a href="javascript:;" class="text-success" @click="adminLogin = 'adminUser'">管理员登录</a>
+              <div>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" @click="login">登录</button>
+              </div>
+
             </div>
           </form>
         </div>
@@ -124,11 +132,18 @@
     data() {
       return {
         loginState: false,
+        username: '',
         registerUsername: '',
         registerPassword: '',
         loginUsername: '',
-        loginPassword: ''
+        loginPassword: '',
+        registerError: false,
+        loginError: false,
+        adminLogin: 'normalUser'
       }
+    },
+    created() {
+
     },
     methods: {
       register() {
@@ -140,13 +155,26 @@
             let that = this;
             this.$axios({
               method: 'post',
-              url: '/server/userCenter/register.php',
+              url: '/users/register',
               data: {
                 username: this.registerUsername,
                 password: this.registerPassword
               }
             }).then(function (res) {
-              console.log(res);
+              switch (res.data.resStatus) {
+                case '200':
+                  that.loginState = true;
+                  that.username = res.data.results.userName;
+                  $(function () {
+                    $('#registerModal').modal('hide');
+                  });
+                  break;
+                case '201':
+                  that.registerError = true;
+                  break;
+                default:
+                  break;
+              }
             });
           }
         })
@@ -157,7 +185,38 @@
           loginPassword: this.loginPassword
         }).then((result) => {
           if (result) {
-            console.log("登录用户名:", this.loginUsername);
+            let that = this;
+            this.$axios({
+              method: 'post',
+              url: '/users/login',
+              data: {
+                username: this.loginUsername,
+                password: this.loginPassword
+              }
+            }).then(function (res) {
+              //console.log(res);
+              if(res.data.resStatus == 200 && res.data.results.userType == that.adminLogin){
+                that.loginState = true;
+                that.username = res.data.results.userName;
+                $(function () {
+                  $('#loginModal').modal('hide');
+                });
+              }else{
+                that.loginError = true;
+              }
+            });
+          }
+        })
+      },
+      logout() {
+        //console.log(document.cookie);
+        let that = this;
+        this.$axios({
+          method: 'get',
+          url: '/users/logout'
+        }).then(function (res) {
+          if(res.data.resStatus == 200){
+            that.loginState = false;
           }
         })
       }
