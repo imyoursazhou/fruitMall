@@ -1,11 +1,12 @@
-var express = require('express');
-var path = require('path');
-var logger = require('morgan');
-const cookieParser = require('cookie-parser');
+const express = require('express');
+const cookieSession = require('cookie-session');
+const path = require('path');
+const logger = require('morgan');
 var bodyParser = require('body-parser');
 
-var index = require('./routes/index');
+var orders = require('./routes/orders');
 var users = require('./routes/users');
+var goods = require('./routes/goods');
 
 var app = express();
 
@@ -18,11 +19,19 @@ app.set('view engine', 'html');
 app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
-app.use(cookieParser());
+//app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/', index);
+app.use('/orders', orders);
 app.use('/users', users);
+app.use('/goods', goods);
+
+app.use(cookieSession({
+  name: 'session',
+  keys: ['azhou'],  //secret keys
+  //cookie options
+  maxAge: 24 * 60 * 60 * 1000 //存储24小时
+}));
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

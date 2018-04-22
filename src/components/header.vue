@@ -35,21 +35,24 @@
             <div class="modal-body">
               <span class="text-danger" v-if="registerError">用户名已存在，注册失败！</span>
               <div class="form-group row">
-                <label class="col-sm-2 col-form-label text-right">用户名</label>
-                <div class="col-sm-10 d-flex align-items-center">
+                <label class="col-sm-3 col-form-label text-right">
+                  <span class="text-danger">*</span>手机号:</label>
+                <div class="col-sm-9 d-flex align-items-center">
                   <input type="text"
                          class="form-control"
                          name="registerUsername"
                          v-model="registerUsername"
-                         v-validate="'required'"
+                         v-validate="'required|mobile'"
+                         placeholder="请输入您的联系号码"
                          :class="{borderDanger:errors.has('registerUsername')}">
                   <span v-if="errors.has('registerUsername')"
                         class="text-danger ml-3 w-75">{{ errors.first('registerUsername') }}</span>
                 </div>
               </div>
               <div class="form-group row">
-                <label class="col-sm-2 col-form-label text-right">密码</label>
-                <div class="col-sm-10 d-flex align-items-center">
+                <label class="col-sm-3 col-form-label text-right">
+                  <span class="text-danger">*</span>密码:</label>
+                <div class="col-sm-9 d-flex align-items-center">
                   <input type="password"
                          v-validate="'required|min:6'"
                          name="registerPassword"
@@ -76,8 +79,8 @@
       <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" v-if="adminLogin == 'normalUser'">用户登录</h5>
-            <h5 class="modal-title" v-if="adminLogin == 'adminUser'">管理员登录</h5>
+            <h5 class="modal-title" v-if="adminLogin === 'normalUser'">用户登录</h5>
+            <h5 class="modal-title" v-if="adminLogin === 'adminUser'">管理员登录</h5>
             <button type="button" class="close" data-dismiss="modal" aria-label="Close">
               <span aria-hidden="true">&times;</span>
             </button>
@@ -118,7 +121,6 @@
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">关闭</button>
                 <button type="button" class="btn btn-primary" @click="login">登录</button>
               </div>
-
             </div>
           </form>
         </div>
@@ -128,6 +130,8 @@
 </template>
 
 <script>
+  import {mapState} from 'vuex'
+
   export default {
     data() {
       return {
@@ -142,8 +146,11 @@
         adminLogin: 'normalUser'
       }
     },
-    created() {
-
+    mounted() {
+      this.checkLogin();
+    },
+    computed: {
+      ...mapState(['userName', 'userId', 'cartCount'])
     },
     methods: {
       register() {
@@ -155,7 +162,7 @@
             let that = this;
             this.$axios({
               method: 'post',
-              url: '/users/register',
+              url: 'http://azhoufm.applinzi.com:4000/users/register',
               data: {
                 username: this.registerUsername,
                 password: this.registerPassword
@@ -165,6 +172,13 @@
                 case '200':
                   that.loginState = true;
                   that.username = res.data.results.userName;
+                  that.$store.commit("updateUserInfo",
+                    {
+                      userName: that.username,
+                      userId: res.data.results.userId
+                    });
+                  window.localStorage.setItem("userName", that.username);
+                  window.localStorage.setItem("userId", res.data.results.userId);
                   $(function () {
                     $('#registerModal').modal('hide');
                   });
@@ -188,20 +202,30 @@
             let that = this;
             this.$axios({
               method: 'post',
-              url: '/users/login',
+              url: 'http://azhoufm.applinzi.com:4000/users/login',
               data: {
                 username: this.loginUsername,
                 password: this.loginPassword
               }
             }).then(function (res) {
               //console.log(res);
-              if(res.data.resStatus == 200 && res.data.results.userType == that.adminLogin){
+              if (res.data.resStatus === '200' && res.data.results.userType === that.adminLogin) {
                 that.loginState = true;
                 that.username = res.data.results.userName;
+                that.$store.commit("updateUserInfo",
+                  {
+                    userName: that.username,
+                    userId: res.data.results.userId
+                  });
+                window.localStorage.setItem("userName", that.username);
+                window.localStorage.setItem("userId", res.data.results.userId);
                 $(function () {
                   $('#loginModal').modal('hide');
+                  if (res.data.results.userType === 'adminUser') {
+                    that.$router.push('/admin/index');
+                  }
                 });
-              }else{
+              } else {
                 that.loginError = true;
               }
             });
@@ -213,12 +237,27 @@
         let that = this;
         this.$axios({
           method: 'get',
-          url: '/users/logout'
+          url: 'http://azhoufm.applinzi.com:4000/users/logout'
         }).then(function (res) {
-          if(res.data.resStatus == 200){
+          if (res.data.resStatus === '200') {
             that.loginState = false;
           }
-        })
+        });
+        that.$store.commit("updateUserInfo",
+          {
+            userName: '',
+            userId: ''
+          });
+        window.localStorage.removeItem('userName');
+        window.localStorage.removeItem('userId');
+      },
+      checkLogin() {
+        if (this.userName) {
+          this.loginState = true;
+          this.username = this.userName;
+        } else {
+          this.loginState = false;
+        }
       }
     }
   }

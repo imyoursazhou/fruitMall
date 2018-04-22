@@ -39,18 +39,26 @@
     </div>
 
     <!--水果列表-->
+    <div class="loading" v-if="loadingFlag">
+      <img src="../../static/images/Spinner-1s-200px.svg" alt="">
+      <p>数据加载中,请稍后......</p>
+    </div>
     <div class="fruit-list">
       <div class="fruit-list-title d-flex justify-content-between pl-5 pr-5">
         <img src="../../static/images/t2.png" alt="">
         <a href="/#">更多>></a>
       </div>
-      <div class="fruit-list-item row pl-5 pr-5 m-0">
-        <div class="card col-md-2 p-0 m-3" v-for="item in 8">
-          <img class="card-img-top" src="../../static/images/fruit2.jpg" alt="">
+      <div class="fruit-list-item row pl-5 pr-5 m-0 d-flex justify-content-center">
+        <div class="card col-md-3 p-0 m-3" v-for="(item,index) in goodsList" :key="item.goodId">
+          <img class="card-img-top" :src='item.imgSrc'>
           <div class="card-body">
-            <h6 class="card-title text-left">美早樱桃（巨无霸）</h6>
-            <p class="card-text text-left text-muted">￥138.00/500g</p>
-            <a href="#" class="btn btn-success text-white">加入购物车</a>
+            <h6 class="card-title text-left">{{ item.name }}</h6>
+            <p class="card-text text-left text-muted">￥{{ item.price }}/500g
+              <span class="ml-2">
+                <input class="form-control d-inline w-25 mr-1" type="text"
+                       v-model="goodsList[index].goodNum" placeholder="1">份
+              </span></p>
+            <a href="javascript:;" class="btn btn-info pl-4 pr-4 text-white" @click="addCart(item,index)">下订单</a>
           </div>
         </div>
       </div>
@@ -101,9 +109,29 @@
           <p class="text-muted">版权所有 ©2018##天天鲜果电子商务有限公司 保留所有权利 | <a href="#">沪ICP备#####</a></p>
           <p class="text-success">天天果园 &nbsp&nbsp鲜果网购</p>
         </div>
-        <div >
+        <div>
           <a href="#"><img src="../../static/images/guan_shgs.gif" alt=""></a>
           <a href="#"><img style="width: 35px;" src="../../static/images/guan_wgdjp.png" alt=""></a>
+        </div>
+      </div>
+    </div>
+    <!--操作结果弹框-->
+    <div class="tip-dialog" v-if="DialogConfig.show">
+      <div class="modal-content w-25">
+        <div class="modal-header">
+          <h5 class="modal-title">操作提示</h5>
+          <button type="button" class="close" @click="closeDialog">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body text-center">
+          <p>{{DialogConfig.message}}</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" @click="deleteGood" v-if="DialogConfig.button2">
+            {{DialogConfig.textButton2}}
+          </button>
+          <button type="button" class="btn btn-secondary" @click="closeDialog">关闭</button>
         </div>
       </div>
     </div>
@@ -112,15 +140,91 @@
 
 <script>
   import HeaderPage from './header'
+  import {mapState} from 'vuex'
 
   export default {
     data() {
       return {
-        loginState: false
+        loadingFlag:true,
+        loginState: false,
+        goodsList: [],
+        goodNum: 1,
+        DialogConfig: {
+          show: false,
+          message: '',
+          button2: true,
+          textButton2: ''
+        },
       }
     },
     components: {
       HeaderPage
+    },
+    created() {
+      this.getGoodsList();
+    },
+    computed: {
+      ...mapState(['userName', 'userId', 'cartCount'])
+    },
+    methods: {
+      getGoodsList() {
+        let that = this;
+        this.$axios({
+          method: 'get',
+          url: 'http://azhoufm.applinzi.com:4000/goods/getList'
+        }).then(function (res) {
+          if (res.data.resStatus === '200') {
+            that.loadingFlag = false;
+            that.goodsList = res.data.result;
+          } else {
+            that.DialogConfig = {
+              show: true,
+              message: '获取商品列表失败,请尝试刷新页面',
+              button2: false
+            };
+          }
+        })
+      },
+      addCart(good, index) {
+        if (this.userName) {
+          let that = this;
+          let goodNum;
+          if (!that.goodsList[index].goodNum) {
+            goodNum = 1;
+          } else {
+            goodNum = that.goodsList[index].goodNum;
+          }
+          this.$axios({
+            method: 'post',
+            url: 'http://azhoufm.applinzi.com:4000/orders/addOrder',
+            data: {
+              userName: this.userName,
+              goodId:good.goodId,
+              goodNum,
+              goodName:good.name
+            }
+          }).then(function (res) {
+            if (res.data.resStatus === '200') {
+              that.DialogConfig = {
+                show: true,
+                message: '下单成功,商城管理员将会尽快联系您',
+                button2: false
+              };
+            } else {
+              console.log("此商品已售空,加入购物车失败");
+            }
+          });
+        } else {
+          this.DialogConfig = {
+            show: true,
+            message: '登陆后才能进行加购物车操作哦',
+            button2: false
+          };
+        }
+      },
+      closeDialog() {
+        this.DialogConfig.show = false;
+      }
     }
   }
 </script>
@@ -128,11 +232,14 @@
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style lang="scss" scoped>
   .fruit-list-item .card {
-    cursor: pointer;
     &:hover {
       box-shadow: 0 3px 3px rgba(0, 0, 0, .5);
       animation: pulse 1s 0s ease both;
       transition: all 0s .2s;
     }
+    img {
+      height: 180px;
+    }
   }
+
 </style>

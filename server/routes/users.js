@@ -11,7 +11,7 @@ function select(sql) {
       host: 'localhost',
       user: 'root',
       password: 'root',
-      database: 'fruit_mall'
+      database: 'fruitmall'
     });
     /*开启连接数据库*/
     connection.connect();
@@ -22,7 +22,7 @@ function select(sql) {
         reject(err);
       } else {
         resolve({
-          sqlStatus: 200,
+          sqlStatus: '200',
           result
         });
       }
@@ -33,13 +33,26 @@ function select(sql) {
   return mySqlPromise;
 }
 
+/*自定义生成随机唯一商品/订单编号*/
+function randomString(len) {
+  len = len || 32;
+  let $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let maxPos = $chars.length;
+  let pwd = '';
+  for (let i = 0; i < len; i++) {
+    //0~32的整数
+    pwd += $chars.charAt(Math.floor(Math.random() * (maxPos + 1)));
+  }
+  return pwd;
+}
+
 /* 登录 */
 router.post('/login', function (req, res) {
   let loginName = req.body.username;
   let loginPwd = req.body.password;
   select('SELECT * FROM users WHERE username = "' + loginName + '";')
     .then(function (data) {
-      if (data.sqlStatus == 200 && data.result.length > 0) {
+      if (data.sqlStatus === '200' && data.result.length > 0) {
         let user = data.result[0];
         bcrypt.compare(loginPwd, user.password, function (err, isMatch) {
           if (err) {
@@ -51,12 +64,15 @@ router.post('/login', function (req, res) {
                 path: '/',
                 maxAge: 1000 * 60 * 60
               });*/
+              //console.log(req.session.username);
+              //req.session.username = loginName;
               res.json({
                 resStatus: '200',
                 msg: '用户名密码匹配成功，允许登录',
                 results: {
                   userName: user.username,
-                  userType: user.type
+                  userType: user.type,
+                  userId: user.userId
                 }
               });
             } else {
@@ -83,6 +99,8 @@ router.post('/register', function (req, res) {
   let userPwd = req.body.password;
   let userType = 'normalUser';
 
+  let userId = 'UD' + randomString(10);
+
   /*将用户设置的密码通过bcrypt进行加盐+hash后再进行存储*/
   bcrypt.genSalt(SALT_WORK_FACTOR, function (err, salt) {
     if (err) {
@@ -99,22 +117,24 @@ router.post('/register', function (req, res) {
   });
   select('SELECT * FROM users WHERE username = "' + userName + '";')
     .then(function (data) {
-      if (data.sqlStatus == 200 && data.result.length > 0) {
+      if (data.sqlStatus === '200' && data.result.length > 0) {
         res.json({
           resStatus: '201',
           msg: '用户名已存在,注册失败'
         });
         res.end();
       } else {
-        select('INSERT INTO users(username,password,type) VALUES ("' + userName + '","' + userPwd + '","' + userType + '");')
+        select('INSERT INTO users(username,password,type,userId) VALUES ("' + userName + '","' + userPwd + '","' + userType + '","' + userId + '");')
           .then(function (data) {
-            if (data.sqlStatus == 200 && data.result.affectedRows > 0) {
+            if (data.sqlStatus === '200' && data.result.affectedRows > 0) {
+              //req.session.username = userName;
               res.json({
                 resStatus: '200',
                 msg: '新用户注册成功',
                 results: {
                   userName,
-                  userType
+                  userType,
+                  userId
                 }
               });
               res.end();
@@ -128,10 +148,12 @@ router.post('/register', function (req, res) {
 
 /*退出登录*/
 router.get('/logout', function (req, res) {
-  res.cookie("userName", "", {
+  /*res.cookie("userName", "", {
     path: "/",
     maxAge: -1
-  });
+  });*/
+  /*delete req.session.user;
+  delete res.locals.user;*/
   res.json({
     resStatus: '200',
     msg: '退出登录成功',
@@ -139,5 +161,33 @@ router.get('/logout', function (req, res) {
   })
 });
 
+/*获取用户列表*/
+router.get('/userList', function (req, res) {
+  select('SELECT * FROM users;').then(function (data) {
+    if (data.sqlStatus === '200' && data.result.length > 0) {
+      let userList = [];
+      let userObj = {};
+      for (let i = 0; i < data.result.length; i++) {
+        userObj = {
+          userId: data.result[i].userId,
+          username: data.result[i].username,
+          type: data.result[i].type
+        };
+        userList.push(userObj);
+      }
+      res.json({
+        resStatus: '200',
+        msg: '查询用户列表成功',
+        result: userList
+      })
+    } else {
+      res.json({
+        resStatus: '201',
+        msg: '用户列表为空',
+        result: []
+      })
+    }
+  })
+});
 
 module.exports = router;

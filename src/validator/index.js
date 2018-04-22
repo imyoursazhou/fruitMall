@@ -37,3 +37,12 @@ const dictionary = {
   }
 };
 Validator.localize('zh_CN', dictionary.zh_CN);
+
+Validator.extend('mobile', {
+  getMessage: function () {
+    return '号码格式不正确'
+  },
+  validate: value => {
+    return value.length == 11 && /^((13|14|15|17|18)[0-9]{1}\d{8})$/.test(value);
+  }
+});
